@@ -1,0 +1,115 @@
+---
+title: "Assignment 1, SOK-1005"
+format: pdf
+editor: visual
+---
+
+# Assignment 1 - reading static web pages 
+
+Use Quarto and prepare a small HTML report of the following task with a February 03, 2025 deadline. Store your code in your GitHub repository, and submit the link in Canvas. This is a compulsory assignment. 
+
+\
+\
+
+On the web page:
+
+ <https://www.drroyspencer.com/latest-global-temperatures/>
+
+\
+
+We find a figure of the latest global temperature 
+
+(data at the bottom of page):\
+
+![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXc_V0zug2riyItBkjwKET0FQSYAMFg2wX2kvr42VsJSsTpwD-EE1wq_ZZTNWM4FRjnBloZrLh-x6hLh097yejUbB_t7QO1h4NCAIoGDzPRNy2Zlufc4TeEsGegp1f6Qa_9Oe4edPw?key=yAXZIV9Hb-4exgkbKPwl2Q)
+
+\
+\
+
+Download the four data series, i.e., temperature measurements at the four different atmospheric locations: the Lower-Troposphere, Mid-Troposphere, Tropopause, and Lower-Stratosphere. Each dataset is found using its unique URL. 
+
+\
+
+Use only the Global temperature from each dataset (i.e., the third data column). 
+
+For each of the four locations in the atmosphere, calculate the **12-month(right-aligned) moving average** (or mean) (you can run **?zoo::rollmean** in the R console to understand what the **right-aligned average** means**)** using all the available data points. Also, calculate a new variable called **Average**, which is the average of the four 12-month moving averages. Make a plot of the four atmosphere locations and their **Average** in the same plot. Note, the original data points are not to be used in the plot. Include labels identifying the location of the temperature measurements, and the **Average**. You should only use data from January 1980 and onwards in the plot. 
+
+\
+
+Add an appropriate main title and labels to the axis of the plot. Modify and use the R code we have been utilizing in class. The R code should replicate your plot when executed (run) from top to bottom. 
+
+\
+\
+
+**Some general considerations**
+
+You should not submit a .zip file, or many files containing the data. **Submit one file with your code**. Your code should be general, meaning that you read the data from the source, i.e. the URL’s, do all the data wrangling, and make the plot.
+
+**Note**
+
+This assignment submission is obligatory. If you fail to meet the deadline without providing a notice from a medical doctor that you are not able to meet the deadline, you are not eligible to submit a data science project. \
+
+```{r, warning=FALSE}
+# download library pages
+library(zoo)
+library(ggplot2)
+library(dplyr)
+
+# Naming the urls
+urls <- list(
+  "Lower Troposphere" = "http://vortex.nsstc.uah.edu/data/msu/v6.1/tlt/uahncdc_lt_6.1.txt",
+  "Mid Troposphere" = "http://vortex.nsstc.uah.edu/data/msu/v6.1/tmt/uahncdc_mt_6.1.txt",
+  "Tropopause" = "http://vortex.nsstc.uah.edu/data/msu/v6.1/ttp/uahncdc_tp_6.1.txt",
+  "Lower Stratosphere" = "http://vortex.nsstc.uah.edu/data/msu/v6.1/tls/uahncdc_ls_6.1.txt"
+)
+
+# Function to download and process data
+process_data <- function(url) {
+  data <- read.table(url, header = FALSE, skip = 1, fill = TRUE, stringsAsFactors = FALSE)
+  
+  colnames(data) <- make.names(scan(url, what = character(), nlines = 1, quiet = TRUE), unique = TRUE)
+  
+  data <- data %>% select(Year, Mo, Globe)
+  
+  #Give column name
+  colnames(data) <- c("Year", "Month", "Global")
+  
+  #Merge to numeric
+  data$Global <- as.numeric(data$Global)
+  
+  #Set up dates to the dataset
+  data$Date <- as.Date(paste(data$Year, data$Month, "01", sep = "-"))
+
+  #Filter to 1980 and up
+  data <- data %>% filter(Date >= as.Date("1980-01-01"))
+
+  data <- data %>% mutate(Moving_Avg = rollmean(Global, 12, fill = NA, align = "right"))
+
+  return(data %>% select(Date, Moving_Avg))
+}
+
+
+# Storage the dataset as list
+data_list <- lapply(urls, process_data)
+
+# Merge the two datasets
+combined_data <- Reduce(function(df1, df2) merge(df1, df2, by = "Date", all = TRUE), data_list)
+
+# Rename columns for clarity
+names(combined_data)[-1] <- names(urls)
+
+# Calculate the average across the four layers
+combined_data$Average <- rowMeans(combined_data[, -1], na.rm = TRUE)
+
+#Make a plot out of the result
+ggplot(combined_data, aes(x = Date)) +
+  geom_line(aes(y = `Lower Troposphere`, color = "Lower Troposphere")) +
+  geom_line(aes(y = `Mid Troposphere`, color = "Mid Troposphere")) +
+  geom_line(aes(y = `Tropopause`, color = "Tropopause")) +
+  geom_line(aes(y = `Lower Stratosphere`, color = "Lower Stratosphere")) +
+  geom_line(aes(y = Average, color = "Average"), size = 1, linetype = "dashed") +
+  labs(title = "12-Month Moving Average of Global Temperature Anomalies",
+       x = "Year", y = "Temperature Anomaly (°C)", color = "Atmospheric Layer") +
+  theme_minimal()
+
+```
